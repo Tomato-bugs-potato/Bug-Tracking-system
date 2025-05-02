@@ -1,0 +1,44 @@
+name: Bug Tracker Integration
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+    branches: [main, master]
+
+jobs:
+  test-and-report:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: "18"
+          cache: "npm"
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run tests and capture output
+        id: run_tests
+        continue-on-error: true
+        run: |
+          npm test > test_output.txt 2>&1
+          echo "::set-output name=exit_code::$?"
+
+      - name: Report test failures
+        if: steps.run_tests.outputs.exit_code != '0'
+        run: |
+          ENCODED_OUTPUT=$(cat test_output.txt | base64 -w 0)
+          curl -X POST "${{ secrets.BUG_TRACKER_URL }}/api/ci-report" \
+            -H "Content-Type: application/json" \
+            -H "Authorization: Bearer ${{ secrets.BUG_TRACKER_API_KEY }}" \
+            -d "{
+              \"projectId\": \"${{ secrets.BUG_TRACKER_PROJECT_ID }}\",
+              \"commit\": \"${{ github.sha }}\",
+              \"branch\": \"${{ github.ref_name }}\",
+              \"repository\": \"${{ github.repository }}\",
+              \"testOutput\": \"${ENCODED_OUTPUT}\"
+            }"

@@ -1,0 +1,177 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+  output   = "./generated"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id           String          @id @default(cuid())
+  name         String
+  email        String          @unique
+  password     String
+  image        String?
+  createdAt    DateTime        @default(now())
+  updatedAt    DateTime        @updatedAt
+  role         String          @default("USER")
+  status       String          @default("ACTIVE")
+  inviteToken  String?
+  projects     ProjectMember[]
+  reportedBugs Bug[]           @relation("Reporter")
+  assignedBugs Bug[]           @relation("Assignee")
+  comments     Comment[]
+  activities   Activity[]
+  settings     UserSettings?
+}
+
+enum Role {
+  USER
+  ADMIN
+}
+
+model Project {
+  id          String          @id @default(cuid())
+  name        String
+  description String?
+  status      ProjectStatus   @default(ACTIVE)
+  createdAt   DateTime        @default(now())
+  updatedAt   DateTime        @updatedAt
+  members     ProjectMember[]
+  bugs        Bug[]
+  activities  Activity[]
+  gitUrl      String? // Git repository URL
+  gitBranch   String? // Default branch
+  gitProvider String? // e.g., "github", "gitlab", "bitbucket"
+  gitToken    String? // Encrypted Git access token
+  apiKey      String?         @unique // API key for CI integration
+}
+
+enum ProjectStatus {
+  ACTIVE
+  COMPLETED
+  ON_HOLD
+}
+
+model ProjectMember {
+  id        String      @id @default(cuid())
+  role      ProjectRole @default(MEMBER)
+  user      User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId    String
+  project   Project     @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  projectId String
+  createdAt DateTime    @default(now())
+  updatedAt DateTime    @updatedAt
+
+  @@unique([userId, projectId])
+}
+
+enum ProjectRole {
+  OWNER
+  MANAGER
+  MEMBER
+}
+
+model Bug {
+  id               String       @id @default(cuid())
+  title            String
+  description      String
+  stepsToReproduce String?
+  status           BugStatus    @default(OPEN)
+  priority         Priority     @default(MEDIUM)
+  severity         Severity     @default(MAJOR)
+  project          Project      @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  projectId        String
+  reporter         User         @relation("Reporter", fields: [reporterId], references: [id])
+  reporterId       String
+  assignee         User?        @relation("Assignee", fields: [assigneeId], references: [id])
+  assigneeId       String?
+  createdAt        DateTime     @default(now())
+  updatedAt        DateTime     @updatedAt
+  comments         Comment[]
+  activities       Activity[]
+  attachments      Attachment[]
+  source           String?      @default("user")
+}
+
+enum BugStatus {
+  OPEN
+  IN_PROGRESS
+  RESOLVED
+  CLOSED
+}
+
+enum Priority {
+  HIGH
+  MEDIUM
+  LOW
+}
+
+enum Severity {
+  CRITICAL
+  MAJOR
+  MINOR
+  TRIVIAL
+}
+
+model Comment {
+  id        String   @id @default(cuid())
+  content   String
+  bug       Bug      @relation(fields: [bugId], references: [id], onDelete: Cascade)
+  bugId     String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId    String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Activity {
+  id        String   @id @default(cuid())
+  action    String
+  bug       Bug?     @relation(fields: [bugId], references: [id], onDelete: Cascade)
+  bugId     String?
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId    String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  project   Project? @relation(fields: [projectId], references: [id])
+  projectId String?
+}
+
+model Attachment {
+  id        String   @id @default(cuid())
+  filename  String
+  fileUrl   String
+  fileType  String
+  bug       Bug      @relation(fields: [bugId], references: [id], onDelete: Cascade)
+  bugId     String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model UserSettings {
+  id                 String   @id @default(cuid())
+  userId             String   @unique
+  user               User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  emailNotifications Boolean  @default(true)
+  pushNotifications  Boolean  @default(true)
+  theme              String   @default("system")
+  dateFormat         String   @default("mdy")
+  timezone           String   @default("utc")
+  compactMode        Boolean  @default(false)
+  sidebarPosition    String   @default("left")
+  accentColor        String   @default("blue")
+  sessionTimeout     String   @default("60")
+  apiReadAccess      Boolean  @default(true)
+  apiWriteAccess     Boolean  @default(false)
+  apiDeleteAccess    Boolean  @default(false)
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+
+  @@index([userId])
+}
