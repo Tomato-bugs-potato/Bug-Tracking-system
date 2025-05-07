@@ -16,14 +16,18 @@ model User {
   name         String
   email        String          @unique
   password     String
+  image        String?
   createdAt    DateTime        @default(now())
   updatedAt    DateTime        @updatedAt
-  role         Role            @default(USER)
+  role         String          @default("USER")
+  status       String          @default("ACTIVE")
+  inviteToken  String?
   projects     ProjectMember[]
   reportedBugs Bug[]           @relation("Reporter")
   assignedBugs Bug[]           @relation("Assignee")
   comments     Comment[]
   activities   Activity[]
+  settings     UserSettings?
 }
 
 enum Role {
@@ -40,6 +44,12 @@ model Project {
   updatedAt   DateTime        @updatedAt
   members     ProjectMember[]
   bugs        Bug[]
+  activities  Activity[]
+  gitUrl      String? // Git repository URL
+  gitBranch   String? // Default branch
+  gitProvider String? // e.g., "github", "gitlab", "bitbucket"
+  gitToken    String? // Encrypted Git access token
+  apiKey      String?         @unique // API key for CI integration
 }
 
 enum ProjectStatus {
@@ -86,6 +96,7 @@ model Bug {
   comments         Comment[]
   activities       Activity[]
   attachments      Attachment[]
+  source           String?      @default("user")
 }
 
 enum BugStatus {
@@ -128,6 +139,8 @@ model Activity {
   userId    String
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+  project   Project? @relation(fields: [projectId], references: [id])
+  projectId String?
 }
 
 model Attachment {
@@ -139,4 +152,26 @@ model Attachment {
   bugId     String
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+}
+
+model UserSettings {
+  id                 String   @id @default(cuid())
+  userId             String   @unique
+  user               User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  emailNotifications Boolean  @default(true)
+  pushNotifications  Boolean  @default(true)
+  theme              String   @default("system")
+  dateFormat         String   @default("mdy")
+  timezone           String   @default("utc")
+  compactMode        Boolean  @default(false)
+  sidebarPosition    String   @default("left")
+  accentColor        String   @default("blue")
+  sessionTimeout     String   @default("60")
+  apiReadAccess      Boolean  @default(true)
+  apiWriteAccess     Boolean  @default(false)
+  apiDeleteAccess    Boolean  @default(false)
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+
+  @@index([userId])
 }
